@@ -1,5 +1,5 @@
 /* File: GBN.c
- * Authors: Kim Svedberg, Zebastian Thorsén
+ * Authors: Kim Svedberg, Zebastian ThorsÃ©n
  * Description: File containing all function for the GBN protocol like connection setup & teardown.
  */
 
@@ -711,7 +711,7 @@ ssize_t sender_gbn(int sockfd, const void* buf, size_t len, int flags) // receiv
 	{
 		int window_sizei = 0;        /* Initialize window size for each iteration */
 
-		switch (state.state) { //////
+		switch (s_state) { 
 
 		case ESTABLISHED:
 
@@ -723,11 +723,11 @@ ssize_t sender_gbn(int sockfd, const void* buf, size_t len, int flags) // receiv
 			{
 				// Prepare DATA packet
 				DATA_packet->seq = next_seq_num;
-				strncpy(DATA_packet->data, &buf[next_seq_num], PACKET_SIZE - sizeof(uint16_t) - sizeof(uint16_t)); // Copy data to packet, buf+next_seq_num
+				strncpy(DATA_packet->data, data_array[next_seq_num], sizeof(data_array) - 1; // Copy data to packet, buf+next_seq_num
 				DATA_packet->checksum = checksum(DATA_packet);
 
 				// Send DATA packet
-				sendto(sockfd, DATA_packet, PACKET_SIZE, 0, (struct sockaddr*)&client_sockaddr, client_socklen);
+				sendto(sockfd, DATA_packet, PACKET_SIZE, 0, (struct sockaddr*)&client_sockaddr, client_socklen); //sizeof
 
 				// Increment window variables
 				window_sizei++;
