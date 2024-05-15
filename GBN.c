@@ -730,6 +730,11 @@ ssize_t sender_gbn(int sockfd, const void* buf, size_t len, int flags) // receiv
 				// Send DATA packet
 				sendto(sockfd, DATA_packet, sizeof(*DATA_packet), 0, (struct sockaddr*)&client_sockaddr, client_socklen); //sizeof
 
+// Start timer for the first packet in the window
+                    if (window_sizei == 0) {
+                      //  gettimeofday(&start, NULL);
+		    }
+
 				// Increment window variables
 				window_sizei++;
 				next_seq_num++;
@@ -740,12 +745,57 @@ ssize_t sender_gbn(int sockfd, const void* buf, size_t len, int flags) // receiv
                     fd_set readfds;
                     FD_ZERO(&readfds);
                     FD_SET(sockfd, &readfds);
+
+                 struct timeval timeout;
+                 timeout.timeout_sec = 5;
+		 timeout.timeout_usec = 0;
+
+		int result = select(sockfd + 1, &readfds, NULL, NULL, &timeout);
+
+                    if (result == -1) {
+                        perror("select");
+                        free(DATA_packet);
+                        return -1;
+                    } else if (result == 0) {
+                        // Timeout occurred, change state to PACKET_LOSS to retransmit packets
+                        s_state = PACKET_LOSS;
+                        break;
+                    } else { //received ACK
+			    ssize_t recv_len = recvfrom(sockfd, ACK_packet, sizeof(*ACK_packet), 0, (struct sockaddr*)&client_sockaddr, &client_socklen);
+                        if (recv_len > 0 && ACK_packet->flags == DATA && ACK_packet->checksum == checksum(ACK_packet)) {
+                            base = ACK_packet->seq + 1;
+
+                           if (base == next_seq_num) {
+				  // All packets in the window are acknowledged
+                                s_state = ESTABLISHED;
+                                break;
+                            } else {
+                                // More packets are in-flight
+                                s_state = RCVD_ACK;
+                            }
+			   } 
+		  } 
+		} 
+			    
+			
 			break;
 
 		case PACKET_LOSS:
+                for (int i = base; i < next_seq_num; i++) {
+                    DATA_packet->seq = i;
+                    strncpy(DATA_packet->data, data_array[i], sizeof(DATA_packet->data) - 1);
+                    DATA_packet->checksum = checksum(DATA_packet);
+                    DATA_packet->flags = DATA;
+
+                    sendto(sockfd, DATA_packet, sizeof(*DATA_packet), 0, (struct sockaddr*)&client_sockaddr, client_socklen);
+                }
+                //restart timer for the first packet in the window
+                //gettimeofday(&start, NULL);
+                s_state = ESTABLISHED;
 			break;
 
-		case RCVD_ACK:
+		case RCVD_ACK: // continue sending packages within window
+			s_state = ESTABLISHED;
 			break;
 
 		default:
