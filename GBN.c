@@ -702,12 +702,13 @@ ssize_t sender_gbn(int sockfd, const void* buf, size_t len, int flags) // receiv
 
 	int base = 0;                   /* Base sequence number of the window */
 	int next_seq_num = 0;           /* Next sequence number to be sent */
+	size_t total_packets = len;
 
 	const char** data_array = (const char**)buf;
 
 
 
-	while (len > 0)
+	while (base < total_packets)
 	{
 		int window_sizei = 0;        /* Initialize window size for each iteration */
 
@@ -719,20 +720,26 @@ ssize_t sender_gbn(int sockfd, const void* buf, size_t len, int flags) // receiv
 			size_t DATA_offset = 0;
 
 			// Send packets for current window
-			while (window_sizei < state.window_size && next_seq_num < len) // as long as windows size is smaller than 
+			while (window_sizei < state.window_size && next_seq_num < total_packets) // as long as windows size is smaller than 
 			{
 				// Prepare DATA packet
 				DATA_packet->seq = next_seq_num;
-				strncpy(DATA_packet->data, data_array[next_seq_num], sizeof(data_array) - 1; // Copy data to packet, buf+next_seq_num
+				strncpy(DATA_packet->data, data_array[next_seq_num], sizeof(DATA_packet->data) - 1); // Copy data to packet, buf+next_seq_num
 				DATA_packet->checksum = checksum(DATA_packet);
 
 				// Send DATA packet
-				sendto(sockfd, DATA_packet, PACKET_SIZE, 0, (struct sockaddr*)&client_sockaddr, client_socklen); //sizeof
+				sendto(sockfd, DATA_packet, sizeof(*DATA_packet), 0, (struct sockaddr*)&client_sockaddr, client_socklen); //sizeof
 
 				// Increment window variables
 				window_sizei++;
-				next_seq_num += PACKET_SIZE - sizeof(uint16_t) - sizeof(uint16_t);
+				next_seq_num++;
 			}
+	    // Wait for ACKs
+                while (base < next_seq_num)
+		{
+                    fd_set readfds;
+                    FD_ZERO(&readfds);
+                    FD_SET(sockfd, &readfds);
 			break;
 
 		case PACKET_LOSS:
