@@ -728,8 +728,39 @@ ssize_t sender_gbn(int sockfd, const void* buf, size_t len, int flags) // receiv
 				DATA_packet->checksum = checksum(DATA_packet);
 
 				// Send DATA packet
-				sendto(sockfd, DATA_packet, sizeof(*DATA_packet), 0, (struct sockaddr*)&client_sockaddr, client_socklen); //sizeof
+                        if (attempts > MAX_ATTEMPTS) {
+                            // If the max attempts are reached
+                            printf("ERROR: Max attempts are reached.\n");
+                            errno = 0;
+                            state.state = CLOSED;
+                            break;
+                        } else if (maybe_sendto(sockfd, DATA_packet, sizeof(*DATA_packet), 0, &state.address, state.sck_len) == -1) {
+                            // If error in sending DATA packet
+                            printf("ERROR: Unable to send DATA packet.\n");
+                            state.state = CLOSED;
+                            break;
+                        } else {
+                            // If successfully sent a DATA packet
+                            printf("SUCCESS: Sent DATA packet (%d)...\n", DATA_packet->seqnum);
+                            printf("type: %d\t%dseqnum: %d\tchecksum(received): %d\tchecksum(calculated): \n", DATA_packet->type, DATA_packet->seqnum, DATA_packet->checksum, checksum(DATA_packet));
 
+                            if (DATA_packet_counter == 0) {
+                                // If first packet, set time out before FIN
+                                //timeout using select
+                            }
+                            UNACKed_packets_counter++;
+                        }
+                    }
+                }
+                attempts++;
+				
+		
+				//sendto(sockfd, DATA_packet, sizeof(*DATA_packet), 0, (struct sockaddr*)&client_sockaddr, client_socklen); //sizeof
+
+
+
+
+				
 // Start timer for the first packet in the window
                     if (window_sizei == 0) {
                       //  gettimeofday(&start, NULL);
@@ -858,7 +889,7 @@ ssize_t receiver_gbn(int sockfd, void* buf, size_t len, int flags) {
 						ACK_packet->checksum = checksum(ACK_packet);
 					}
 
-					/* Regardless of sequencxe number, send ACK */
+					/* Regardless of sequence number, send ACK */
 					if (maybe_sendto(sockfd, ACK_packet, sizeof(*ACK_packet), 0, &client_addr, &client_len) == -1) {
 						perror("maybe_sendto");
 						exit(EXIT_FAILURE);
