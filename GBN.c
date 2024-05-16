@@ -712,7 +712,7 @@ ssize_t sender_gbn(int sockfd, const void* buf, size_t len, int flags) // receiv
 	{
 		int window_sizei = 0;        /* Initialize window size for each iteration */
 
-		switch (s_state) { 
+		switch (state.state) { //state.state because of state_t struct
 
 		case ESTABLISHED:
 
@@ -722,6 +722,8 @@ ssize_t sender_gbn(int sockfd, const void* buf, size_t len, int flags) // receiv
 			// Send packets for current window
 			while (window_sizei < state.window_size && next_seq_num < total_packets) // as long as windows size is smaller than 
 			{
+				//int data_packet_count = 0;
+				
 				// Prepare DATA packet
 				DATA_packet->seq = next_seq_num;
 				strncpy(DATA_packet->data, data_array[next_seq_num], sizeof(DATA_packet->data) - 1); // Copy data to packet, buf+next_seq_num
@@ -744,13 +746,16 @@ ssize_t sender_gbn(int sockfd, const void* buf, size_t len, int flags) // receiv
                             printf("SUCCESS: Sent DATA packet (%d)...\n", DATA_packet->seqnum);
                             printf("type: %d\t%dseqnum: %d\tchecksum(received): %d\tchecksum(calculated): \n", DATA_packet->type, DATA_packet->seqnum, DATA_packet->checksum, checksum(DATA_packet));
 
-                            if (DATA_packet_counter == 0) {
+                            if (window_sizei == 0) {
                                 // If first packet, set time out before FIN
+				    alarm(5);
                                 //timeout using select
                             }
                             UNACKed_packets_counter++;
+			    next_seq_num++;
                         }
                     }
+			windowsizei++;
                 }
                 attempts++;
 				
@@ -762,14 +767,14 @@ ssize_t sender_gbn(int sockfd, const void* buf, size_t len, int flags) // receiv
 
 				
 // Start timer for the first packet in the window
-                    if (window_sizei == 0) {
+                   /* if (window_sizei == 0) {
                       //  gettimeofday(&start, NULL);
 		    }
 
 				// Increment window variables
 				window_sizei++;
 				next_seq_num++;
-			}
+			}*/
 	    // Wait for ACKs
                 while (base < next_seq_num)
 		{
@@ -786,10 +791,11 @@ ssize_t sender_gbn(int sockfd, const void* buf, size_t len, int flags) // receiv
                     if (result == -1) {
                         perror("select");
                         free(DATA_packet);
+			free(ACK_packet);
                         return -1;
                     } else if (result == 0) {
                         // Timeout occurred, change state to PACKET_LOSS to retransmit packets
-                        s_state = PACKET_LOSS;
+                        state.state = PACKET_LOSS;
                         break;
                     } else { //received ACK
 			    ssize_t recv_len = recvfrom(sockfd, ACK_packet, sizeof(*ACK_packet), 0, (struct sockaddr*)&client_sockaddr, &client_socklen);
@@ -798,11 +804,11 @@ ssize_t sender_gbn(int sockfd, const void* buf, size_t len, int flags) // receiv
 
                            if (base == next_seq_num) {
 				  // All packets in the window are acknowledged
-                                s_state = ESTABLISHED;
+                                state.state = ESTABLISHED; ////////state_t ???
                                 break;
                             } else {
                                 // More packets are in-flight
-                                s_state = RCVD_ACK;
+                                state.state = RCVD_ACK;
                             }
 			   } 
 		  } 
@@ -818,15 +824,17 @@ ssize_t sender_gbn(int sockfd, const void* buf, size_t len, int flags) // receiv
                     DATA_packet->checksum = checksum(DATA_packet);
                     DATA_packet->flags = DATA;
 
-                    sendto(sockfd, DATA_packet, sizeof(*DATA_packet), 0, (struct sockaddr*)&client_sockaddr, client_socklen);
+                    //sendto(sockfd, DATA_packet, sizeof(*DATA_packet), 0, (struct sockaddr*)&client_sockaddr, client_socklen);
+			maybesendto(sockfd, DATA_packet, sizeof(*DATA_packet), 0, &state.address, state.sck_len);
                 }
                 //restart timer for the first packet in the window
                 //gettimeofday(&start, NULL);
-                s_state = ESTABLISHED;
+		alarm(5);
+                state.state = ESTABLISHED;
 			break;
 
 		case RCVD_ACK: // continue sending packages within window
-			s_state = ESTABLISHED;
+			state.state = ESTABLISHED;
 			break;
 
 		default:
