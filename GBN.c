@@ -825,13 +825,57 @@ ssize_t sender_gbn(int sockfd, const void* buf, size_t len, int flags) // receiv
                     DATA_packet->flags = DATA;
 
                     //sendto(sockfd, DATA_packet, sizeof(*DATA_packet), 0, (struct sockaddr*)&client_sockaddr, client_socklen);
-			maybesendto(sockfd, DATA_packet, sizeof(*DATA_packet), 0, &state.address, state.sck_len);
+			if(maybesendto(sockfd, DATA_packet, sizeof(*DATA_packet), 0, &state.address, state.sck_len) == -1)
+			{
+	            printf("ERROR: Unable to retransmit DATA packet.\n");
+                    state.state = CLOSED;
+                    break;
+			}
+			else {
+                    printf("SUCCESS: Retransmitted DATA packet (%d)...\n", DATA_packet->seq);
+                }	
                 }
+            // Restart timeout for retransmissions
+            fd_set readfds;
+            FD_ZERO(&readfds);
+            FD_SET(sockfd, &readfds);
+
+            struct timeval timeout;
+            timeout.tv_sec = 5;
+            timeout.tv_usec = 0;
+
+            int result = select(sockfd + 1, &readfds, NULL, NULL, &timeout);
+
+            if (result == -1) {
+                perror("select");
+                free(DATA_packet);
+                free(ACK_packet);
+                return -1;
+            } else if (result == 0) {
+                // Timeout occurred again, handle appropriately
+                printf("ERROR: Timeout occurred during retransmission.\n");
+                state.state = PACKET_LOSS;
+            } else {
+                ssize_t recv_len = recvfrom(sockfd, ACK_packet, sizeof(*ACK_packet), 0, (struct sockaddr*)&client_sockaddr, &client_socklen);
+                if (recv_len > 0 && ACK_packet->flags == ACK && ACK_packet->checksum == checksum(ACK_packet)) {
+                    base = ACK_packet->seq + 1;
+
+                    if (base == next_seq_num) {
+                        // All packets in the window are acknowledged
+                        state.state = ESTABLISHED;
+                    } else {
+                        // More packets are in-flight
+                        state.state = RCVD_ACK;
+                    }
+                }
+            }
+            break;
+		
                 //restart timer for the first packet in the window
                 //gettimeofday(&start, NULL);
-		alarm(5);
+		/*alarm(5);
                 state.state = ESTABLISHED;
-			break;
+			break;*/
 
 		case RCVD_ACK: // continue sending packages within window
 			state.state = ESTABLISHED;
