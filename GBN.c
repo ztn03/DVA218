@@ -679,6 +679,37 @@ int receiver_teardown(int sockfd, const struct sockaddr* client, socklen_t sockl
 }
 
 
+void sendFunc(struct rtp client)
+{
+	client.checksum = checkSumCalc(client);	// checksum before sending packet 
+
+	if(client.flags == SENDING && outoforder == 1)
+	{
+		if(testcorrupt == 1 && client.seq == 1)
+		{
+			corrupt_header(&client, 2);
+			testcorrupt++;
+		}
+		if(outoforder == 1 && client.seq == 10)
+		{
+			printf("Test of out of order\n");
+			outoforder++;
+			return;	// Return instead of sending packet (thus skipping seq = 10)
+		}
+	}
+
+	if(client.flags == SYN && testcorrupt == 5)
+	{
+		strcpy(client.data, "Test of corrupt ACK");
+		corrupt_header(&client, 2);
+		testcorrupt++;
+	}
+
+
+	int rc = sendto(sockfd, &client, sizeof(struct rtp), 0, (const struct sockaddr*)&serveradress, sizeof(serveradress));
+	if(rc < 0)
+		perror("Failed to send message");
+}
 
 ssize_t sender_gbn(int sockfd, const void* buf, size_t len, int flags) // receives array of strings as buf
 {
