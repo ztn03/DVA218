@@ -678,11 +678,11 @@ int receiver_teardown(int sockfd, const struct sockaddr* client, socklen_t sockl
 	}
 }
 
+
+
 ssize_t sender_gbn(int sockfd, const void* buf, size_t len, int flags) // receives array of strings as buf
 {
 	int attempts = 0; // attempts made to send packet, if exceeds limit then throw away and go in to closed state
-
-
 
 	/* Initialize DATA packet */
 	rtp* DATA_packet = malloc(sizeof(*DATA_packet)); // allocate memory for datapacket of rtp type
