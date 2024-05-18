@@ -683,12 +683,12 @@ void sendFunc(struct rtp client)
 {
 	client.checksum = checkSumCalc(client);	// checksum before sending packet 
 
-	if(client.flags == SENDING && outoforder == 1)
+	if(client.flags == SENDING)
 	{
-		if(testcorrupt == 1 && client.seq == 1)
+		if(client.seq == 1)
 		{
-			corrupt_header(&client, 2);
-			testcorrupt++;
+			//corrupt_header(&client, 2);
+			//testcorrupt++;
 		}
 		if(outoforder == 1 && client.seq == 10)
 		{
