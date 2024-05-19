@@ -685,12 +685,12 @@ void sendFunc(struct rtp client)
 
 	if(client.flags == SENDING)
 	{
-		if(client.seq == 1)
+		if(client.seq == 1) //&&
 		{
 			//corrupt_header(&client, 2);
 			//testcorrupt++;
 		}
-		if(outoforder == 1 && client.seq == 10)
+		if(outoforder == 1 && client.seq == 10) //(windowsize 10)
 		{
 			printf("Test of out of order\n");
 			outoforder++;
@@ -727,7 +727,7 @@ ssize_t sender_gbn(int sockfd, const void* buf, size_t len, int flags) // receiv
 	struct sockaddr client_sockaddr;
 	socklen_t client_socklen = sizeof(client_sockaddr);
 
-	int num_UNACK_packet = 0;
+	int num_UNACK_packet = 0; //number of unacknowledged packets
 	size_t DATA_offset = 0;
 
 
